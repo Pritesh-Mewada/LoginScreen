@@ -10,12 +10,16 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.SignInButton
 import android.R.attr.data
 import android.util.Log
+import android.widget.TextView
+import android.widget.Toast
+import com.facebook.*
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.common.api.ApiException
-
-
-
+import com.facebook.login.LoginResult
+import com.facebook.login.LoginManager
+import com.facebook.login.widget.LoginButton
+import org.json.JSONObject
 
 
 class MainActivity : AppCompatActivity() {
@@ -23,6 +27,9 @@ class MainActivity : AppCompatActivity() {
     lateinit var gso:GoogleSignInOptions;
     lateinit var mGoogleSignInClient:GoogleSignInClient;
     lateinit var googleSignInButton:SignInButton;
+    lateinit var callbackManager :CallbackManager;
+    lateinit var loginButton:LoginButton;
+    lateinit var signUpText:TextView;
     var RC_SIGN_IN:Int;
     var TAG:String;
     init {
@@ -40,19 +47,57 @@ class MainActivity : AppCompatActivity() {
         googleSignInButton = findViewById(R.id.google_sign_in) ;
 
         googleSignInButton.setOnClickListener(View.OnClickListener {
-            SignIn();
+            var  signInIntent = mGoogleSignInClient.getSignInIntent();
+            startActivityForResult(signInIntent, RC_SIGN_IN);
         })
 
+        callbackManager = CallbackManager.Factory.create();
 
+        signUpText = findViewById(R.id.signup_text);
+
+        signUpText.setOnClickListener {
+            var intent:Intent = Intent(applicationContext,SignUpActivity::class.java);
+            startActivity(intent)
+        }
+
+
+        loginButton = findViewById<View>(R.id.login_button) as LoginButton
+        loginButton.setReadPermissions("email")
+        // If using in a fragment
+
+
+
+        LoginManager.getInstance().registerCallback(callbackManager,
+                object : FacebookCallback<LoginResult> {
+                    override fun onSuccess(loginResult: LoginResult) {
+                        // App code
+                        var accessToken: AccessToken =loginResult.accessToken;
+                        var profile: Profile = Profile.getCurrentProfile();
+
+                        Log.d(TAG, profile.name);
+
+                        var request :GraphRequest = GraphRequest.newMeRequest(accessToken,object :GraphRequest.GraphJSONObjectCallback{
+                            override fun onCompleted(`object`: JSONObject?, response: GraphResponse?) {
+                                Log.d(TAG, `object`?.get("email") as String?);
+                            }
+
+                        })
+                        var parameters:Bundle = Bundle();
+                        parameters.putString("fields","email");
+                        request.parameters = parameters;
+                        request.executeAsync();
+                    }
+
+                    override fun onCancel() {
+                        // App code
+                    }
+
+                    override fun onError(exception: FacebookException) {
+                        // App code
+                    }
+                });
     }
 
-
-    fun SignIn(){
-
-        var  signInIntent = mGoogleSignInClient.getSignInIntent();
-        startActivityForResult(signInIntent, RC_SIGN_IN);
-
-    }
 
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -64,6 +109,8 @@ class MainActivity : AppCompatActivity() {
             val task = GoogleSignIn.getSignedInAccountFromIntent(data)
             handleSignInResult(task)
         }
+
+        callbackManager.onActivityResult(requestCode, resultCode, data);
 
     }
 
